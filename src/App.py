@@ -89,7 +89,9 @@ class App(ctk.CTk):
 
             column += 1
 
-            train_model = ctk.CTkButton(self.models_tab, width=20, text=TRAIN_BUTTON_TEXT, command=self.get_command_train_button(model_id))
+            train_model = ctk.CTkButton(self.models_tab, width=20, text=TRAIN_BUTTON_TEXT, 
+                                        command=self.get_command_train_button(model_id),
+                                        state=ctk.DISABLED if (model_id == STANDARD_MODEL_ID) else ctk.NORMAL)
             train_model.grid(row=row, column=column, padx=10)
 
             self.models_elements.append(train_model)
