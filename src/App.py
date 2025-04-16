@@ -14,6 +14,7 @@ import uuid
 import json
 import types
 from CTkMessagebox import CTkMessagebox
+from tkinter import ttk
 
 class App(ctk.CTk):
 
@@ -21,7 +22,9 @@ class App(ctk.CTk):
         super().__init__()
 
         self.title(APP_WINDOW_TITLE)
-        self.geometry(f"{1100}x{580}")
+        self.geometry(f"{800}x{400}")
+        self.minsize(700, 300)
+        self.maxsize(850, 600)
 
         logo_image = ctk.CTkImage(dark_image=Image.open(LOGO_IMAGE_PATH),
                                     size=(30, 30))
@@ -140,7 +143,7 @@ class App(ctk.CTk):
         
         return push_change_name
     
-    def get_command_save_button(self, model:keras.src.models.model) -> types.FunctionType:
+    def get_command_save_button(self, model:keras.src.models.model, window) -> types.FunctionType:
 
         '''
         Возвращает функцию, которая открывает диалог сохранения модели
@@ -153,7 +156,11 @@ class App(ctk.CTk):
         def push_save_model():
             filetypes = (("Файл модели (*.keras)", "*.keras"),
                         ("Любой", "*"))
+            window.attributes('-topmost', False)
             new_filename = ctk.filedialog.asksaveasfilename(filetypes=filetypes, title=SAVE_MODEL_WINDOW_TITLE)
+            window.attributes('-topmost', True)
+            if not new_filename:
+                return
             if not str.endswith(new_filename, ".keras"):
                 new_filename += ".keras"
             model.save(new_filename)
@@ -188,72 +195,118 @@ class App(ctk.CTk):
 
         def push_predict():
 
-            def save_predictions():
+            def ask_about_year():
 
-                filetypes = (("Текстовый файл (*.txt)", "*.txt"),
-                        ("Любой", "*"))
-                new_filename = ctk.filedialog.asksaveasfilename(filetypes=filetypes, title=SAVE_RESULT_WINDOW_TITLE)
+                '''
+                Задает вопрос: будет ли для обучения использовать свой файл или стандартный
+                        Параметры:
+                                window (ctk.CTk): главное окно
+                                id (str): id модели, которая будет удалена при нажатии на кнопку
+                '''
 
-                if not str.endswith(new_filename, ".txt"):
-                    new_filename += ".txt"
+                def after_answer():
+                    
+                    year = v.get()
+                    if not (year.isdigit()) or int(year) < 1 or int(year) > 3000:
+                        CTkMessagebox(message=INCORRECT_YEAR_ERROR_TEXT)
+                        return
+                    else:
+                        year_window.destroy()
+                        year_window.update()
+                        predict(year)
 
-                with open(new_filename,'w') as f:
-                    f.write('Месяц;Температура\n')
+                def predict(year):
+
+                    def save_predictions():
+
+                        filetypes = (("Текстовый файл (*.txt)", "*.txt"),
+                                ("Любой", "*"))
+
+                        prediction_result_window.attributes('-topmost', False)
+                        new_filename = ctk.filedialog.asksaveasfilename(filetypes=filetypes, title=SAVE_RESULT_WINDOW_TITLE)
+                        prediction_result_window.attributes('-topmost', True)
+
+                        if not new_filename:
+                            return
+
+                        if not str.endswith(new_filename, ".txt"):
+                            new_filename += ".txt"
+
+                        with open(new_filename,'w') as f:
+                            f.write('Месяц;Температура\n')
+                            for month in range(0, 12):
+                                transfer = "" if month == 12 else "\n"
+                                f.write(f'{MONTHS_NAME[month]};{predicted_temperature[month]:.3f}{transfer}')
+
+                    model, scaler_X, scaler_Y = get_model(id)
+
+                    if model is None:
+                        CTkMessagebox(title="Info", message=STANDARD_MODEL_ISNT_READY)
+                        return
+
+                    test_years = [year] * 12
+                    test_months = [i for i in range(1, 13)]
+
+                    test_input = np.column_stack((test_years, test_months))
+
+                    if scaler_X is None:
+                        # Нет scaler значит, что на вход даются ненормализованные числа
+                        test_input_scaled = test_input
+                    else:
+                        test_input_scaled = scaler_X.transform(test_input)
+
+                    predicted_temperature_scaled = model.predict(test_input_scaled)
+
+                    if scaler_Y is None:
+                        # Нет scaler значит, что на выход выдаются ненормализованные числа
+                        predicted_temperature = predicted_temperature_scaled.reshape(12)
+                    else:
+                        predicted_temperature = scaler_Y.inverse_transform(predicted_temperature_scaled).reshape(12)
+
+                    prediction_result_window = ctk.CTkToplevel(self)
+                    prediction_result_window.title(PREDICT_WINDOW_TITLE_TEMPLATE.format(year))
                     for month in range(0, 12):
-                        transfer = "" if month == 12 else "\n"
-                        f.write(f'{MONTHS_NAME[month]};{predicted_temperature[month]:.3f}{transfer}')
+                        label = ctk.CTkLabel(prediction_result_window, width=10, text=f"{MONTHS_NAME[month]}:")
+                        label.grid(row=month, column=0, padx=10, sticky="w")
+                        label = ctk.CTkLabel(prediction_result_window, text=f"{predicted_temperature[month]:.3f}")
+                        label.grid(row=month, column=1, padx=10)
 
-            model, scaler_X, scaler_Y = get_model(id)
+                    y = predicted_temperature
+                    x = MONTHS_NAME
+                    fig = Figure(figsize=(13, 8), dpi=70)
+                    ax = fig.add_subplot(111)
+                    ax.bar(x, y)
+                    canvas = FigureCanvasTkAgg(fig, master=prediction_result_window)
+                    canvas.draw()
+                    canvas.get_tk_widget().grid(row=0, rowspan=15, column=2, columnspan=6, padx=5, pady=5)
 
-            if model is None:
-                CTkMessagebox(title="Info", message=STANDARD_MODEL_ISNT_READY)
-                return
+                    row = month + 1
+                    save_result_button = ctk.CTkButton(prediction_result_window, text=SAVE_RESULT_BUTTON, command=save_predictions)
+                    save_result_button.grid(row=row, column=0, columnspan=2, padx=10, pady=5)
 
-            test_years = [2025] * 12
-            test_months = [i for i in range(1, 13)]
+                    row = row + 1
+                    OK_button = ctk.CTkButton(prediction_result_window, text=OK_BUTTON_TEXT, command=prediction_result_window.destroy)
+                    OK_button.grid(row=row, column=0, columnspan=2, padx=10, pady=5)
 
-            test_input = np.column_stack((test_years, test_months))
+                    #prediction_result_window.geometry("400x600")
+                    prediction_result_window.resizable(False, False)
 
-            if scaler_X is None:
-                # Нет scaler значит, что на вход даются ненормализованные числа
-                test_input_scaled = test_input
-            else:
-                test_input_scaled = scaler_X.transform(test_input)
+                    prediction_result_window.attributes('-topmost', True)
 
-            predicted_temperature_scaled = model.predict(test_input_scaled)
 
-            if scaler_Y is None:
-                 # Нет scaler значит, что на выход выдаются ненормализованные числа
-                predicted_temperature = predicted_temperature_scaled.reshape(12)
-            else:
-                predicted_temperature = scaler_Y.inverse_transform(predicted_temperature_scaled).reshape(12)
+                year_window = ctk.CTkToplevel(self)
+                year_window.title(YEAR_PREDICT_WINDOW_TITLE)
+                ctk.CTkLabel(year_window, text=YEAR_PREDICT_LABEL_TEXT).pack(ipadx=10, padx=10)
 
-            root = ctk.CTkToplevel(self)
-            root.title(PREDICT_WINDOW_TITLE)
-            for month in range(0, 12):
-                label = ctk.CTkLabel(root, width=10, text=f"{MONTHS_NAME[month]}:")
-                label.grid(row=month, column=0, padx=10, sticky="w")
-                label = ctk.CTkLabel(root, text=f"{predicted_temperature[month]:.3f}")
-                label.grid(row=month, column=1, padx=10)
+                v = ctk.StringVar()
 
-            y = predicted_temperature
-            x = MONTHS_NAME
-            fig = Figure(figsize=(10, 8), dpi=100)
-            ax = fig.add_subplot(111)
-            ax.bar(x, y)
-            canvas = FigureCanvasTkAgg(fig, master=root)
-            canvas.draw()
-            canvas.get_tk_widget().grid(row=0, rowspan=15, column=2, columnspan=6, padx=5, pady=5)
+                ctk.CTkEntry(year_window, textvariable=v).pack(ipadx=10, padx=10)
 
-            row = month + 1
-            save_result_button = ctk.CTkButton(root, text=SAVE_RESULT_BUTTON, command=save_predictions)
-            save_result_button.grid(row=row, column=0, columnspan=2, padx=10, pady=5)
+                ctk.CTkButton(year_window, text=OK_BUTTON_TEXT, command=after_answer).pack(pady=10)
+                year_window.attributes('-topmost', True)
 
-            row = row + 1
-            OK_button = ctk.CTkButton(root, text=OK_BUTTON_TEXT, command=root.destroy)
-            OK_button.grid(row=row, column=0, columnspan=2, padx=10, pady=5)
-
-            root.attributes('-topmost', True)
+            ask_about_year()
+            return
 
         return push_predict
 
@@ -310,6 +363,8 @@ class App(ctk.CTk):
         filetypes = (("Файл модели (*.keras)", "*.keras"),
                     ("Любой", "*"))
         filename = ctk.filedialog.askopenfilename(filetypes=filetypes, title=LOAD_MODEL_WINDOW_TITLE)
+        if not filename:
+            return
         model = load_model(filename)
         new_id = str(uuid.uuid4())
         model.save(MODELS_DIRECTORY_PATH + "\\" + new_id + ".keras")
@@ -338,6 +393,14 @@ def ask_about_training(window:ctk.CTk, id:str):
 
     def after_answer():
 
+        epochs_text = epoch_var.get()
+
+        if epochs_text.isdigit() and int(epochs_text) > 0 and int(epochs_text) < 1000:
+            epochs = int(epochs_text)
+        else:
+            CTkMessagebox(message=INCORRECT_EPOCHS_ERROR_TEXT)
+            return
+        
         root.destroy()
         root.update()
         mode = v.get()
@@ -350,39 +413,44 @@ def ask_about_training(window:ctk.CTk, id:str):
             filename = STANDARD_TRAIN_DATA_PATH
 
         if filename:
-            show_train_window(id, filename, window)
+            show_train_window(id, filename, window, epochs)
 
     root = ctk.CTkToplevel(window)
+
     root.title(TRAIN_MODE_WINDOW_TITLE)
-    ctk.CTkLabel(root, text=TRAIN_MODE_QUESTION).pack(ipadx=10, padx=10)
+    ctk.CTkLabel(root, text=TRAIN_MODE_QUESTION).pack(ipadx=10, padx=10, pady=5)
 
     v = ctk.IntVar()
+    epoch_var = ctk.StringVar(value=DEFAULT_EPOCHS)
 
     train_options = [
         {"text": STANDARD_TRAIN_MODE_TITLE, "value": STANDARD_TRAIN_MODE},
         {"text": FILE_TRAIN_MODE_TITLE, "value": FILE_TRAIN_MODE}
     ]
 
+    ctk.CTkLabel(root, text=TRAIN_WINDOW_EPOCHS_SUBTITLE).pack(anchor="w", ipadx=10, padx=10)
+    ctk.CTkEntry(root, textvariable=epoch_var).pack(anchor="w", ipadx=10, padx=10, pady=5)
+
     for option in train_options:
-        ctk.CTkRadioButton(root, text=option["text"], variable=v, value=option["value"]).pack(anchor="w", padx=5, pady=5)
+        ctk.CTkRadioButton(root, text=option["text"], variable=v, value=option["value"]).pack(anchor="w", padx=7, pady=3)
 
     ctk.CTkButton(root, text=OK_BUTTON_TEXT, command=after_answer).pack(pady=10)
     root.attributes('-topmost', True)
 
-def show_train_window(id:str, filename:str, window:ctk.CTk):
+def show_train_window(id:str, filename:str, window:ctk.CTk, epochs:int):
 
     '''
     Открывает окно обучения модели
             Параметры:
                     id (str): id модели, которая будет удалена при нажатии на кнопку
                     filename(str): имя файла для обучения
-                    window (ctk.CTk): главное окно                    
+                    window (ctk.CTk): главное окно  
+                    epochs (int): количество эпох                  
     '''
 
     def begin_train():
 
-        epochs = 200
-        history, model, evaluate_res, scalers = train_model(id, filename, epochs)
+        history, model, evaluate_res, scalers = train_model(id, filename, epochs, root)
         model_path = MODELS_DIRECTORY_PATH + "\\" + id + ".keras"
         model.save(model_path)
         joblib.dump(scalers["scaler_X"], MODELS_DIRECTORY_PATH + "\\" + "scaler_X" + id + ".keras") 
@@ -399,14 +467,30 @@ def show_train_window(id:str, filename:str, window:ctk.CTk):
         ctk.CTkLabel(root, text=LOSS_CHART_SUBTITLE).pack(ipadx=10, padx=10)
         ctk.CTkLabel(root, text=EVALUATE_RESULT_TEXT.format(evaluate_res["mae"], evaluate_res["mse"])).pack(ipadx=10, padx=10)
         ctk.CTkButton(root, text=OK_BUTTON_TEXT, command=root.destroy).pack(pady=5, side="left", padx=5)
-        ctk.CTkButton(root, text=SAVE_BUTTON_TEXT, command=window.get_command_save_button(model)).pack(pady=5, side="left", padx=5)
+        ctk.CTkButton(root, text=SAVE_BUTTON_TEXT, command=window.get_command_save_button(model, root)).pack(pady=5, side="left", padx=5)
         label.configure(text=TRAIN_DONE_LABEL_TEXT)
+        root.progress_bar.pack_forget()
+        root.progress_label.pack_forget()
+        root.stage_label.pack_forget()
+        root.geometry(f"{430}x{500}")
 
     root = ctk.CTkToplevel(window)
     root.title(TRAIN_WINDOW_TITLE)
     label = ctk.CTkLabel(root, text=TRAIN_WAITING_LABEL_TEXT)
     label.pack(ipadx=10, padx=10, pady=10)
+    root.progress_bar = ttk.Progressbar(master=root, orient="horizontal", length=440, value=0)
+    root.progress_bar.pack(pady=10)
+    root.label_var = ctk.StringVar()
+    root.stage_var = ctk.StringVar()
+    root.stage_label = ctk.CTkEntry(master=root, textvariable=root.stage_var, width=300, justify="center")
+    root.stage_label.pack(pady=5)
+    root.progress_label = ctk.CTkEntry(master=root, textvariable=root.label_var, width=300, justify="center")
+    root.progress_label.pack(pady=5)
+
     root.attributes('-topmost', True)
+
+    root.geometry(f"{430}x{250}")
+    root.resizable(False, False)
 
     root.after(200, begin_train)
 

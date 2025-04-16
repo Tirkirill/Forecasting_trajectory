@@ -1,6 +1,7 @@
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 import numpy as np
+from keras.src.callbacks import Callback
 from keras.models import Sequential, load_model
 from keras.layers import Dense
 from keras.optimizers import Adam
@@ -8,11 +9,33 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from CONSTANTS import *
+from TEXTS import *
 import os
 import pandas as pd
 import joblib
 import json
 import keras
+
+class ProgressBarCallback(Callback):
+    def __init__(self, epochs, window):
+        super().__init__()
+        self.progress_bar = window.progress_bar
+        self.label_var = window.label_var
+        self.stage_var = window.stage_var
+        self.epochs = epochs
+        self.window = window
+
+        self.restart(FIRST_TRAINING_STAGE)
+
+    def restart(self, stage_text):
+        self.progress_bar['value'] = 0
+        self.stage_var.set(stage_text)
+
+    def on_epoch_end(self, epoch, logs=None):
+        progress = (epoch + 1) / self.epochs * 100
+        self.progress_bar['value'] = progress
+        self.label_var.set(TRAINING_PROGRESS_LABEL_TEMPLATE.format(epoch+1, self.epochs))
+        self.window.update_idletasks()
 
 def get_models() -> dict[str:dict]:
 
@@ -113,7 +136,7 @@ def get_sсaled_data(years:list[int], months:list[int], temps:list[int], scaler_
     y_scaled = scaler_y.fit_transform(y.reshape(-1, 1))
     return X_scaled, y_scaled
 
-def train_model(model_id:str, train_data_filename:str, epochs:int):
+def train_model(model_id:str, train_data_filename:str, epochs:int, window):
 
     '''
     Тренирует модель
@@ -170,14 +193,20 @@ def train_model(model_id:str, train_data_filename:str, epochs:int):
     # Оцениваем точность модели
     evaluate_test = {"mae":0, "mse":0}
     X_train, X_test, y_train, y_test = train_test_split(X_scaled, y_scaled)
-    model.fit(X_train, y_train, epochs=epochs)
+    progress_callback = ProgressBarCallback(epochs, window)
+    model.fit(X_train, y_train, epochs=epochs, callbacks=[progress_callback])
+    progress_callback.restart(SECOND_TRAINING_STAGE)
+
     predictions = model.predict(X_test)
     y_pred = scaler_y.inverse_transform(predictions)
     y_true = scaler_y.inverse_transform(y_test)
     evaluate_test["mae"] = mean_absolute_error(y_true, y_pred)
     evaluate_test["mse"] = mean_squared_error(y_true, y_pred)
 
+    progress_callback.restart(THIRD_TRAINING_STAGE)
+
     # Обучение модели
-    history = model.fit(X_test, y_test, epochs=epochs, verbose=1)
+    history = model.fit(X_test, y_test, epochs=epochs, verbose=1, callbacks=[progress_callback])
+    
 
     return history, model, evaluate_test, {"scaler_X": scaler_X, "scaler_Y": scaler_y}
