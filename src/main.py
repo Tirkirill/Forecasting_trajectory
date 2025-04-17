@@ -109,7 +109,7 @@ def get_standard_model() -> keras.src.models.model:
     '''
 
     model = Sequential()
-    model.add(Dense(64, input_dim=2, activation='relu'))
+    model.add(Dense(64, input_dim=3, activation='relu'))
     model.add(Dense(32, activation='relu'))
     model.add(Dense(1, activation='linear'))
     model.compile(optimizer=Adam(learning_rate=0.01), loss='mse')

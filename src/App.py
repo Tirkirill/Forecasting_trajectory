@@ -7,6 +7,7 @@ from TEXTS import *
 from main import get_models, train_model, get_model
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
 import keras
 import joblib
 import numpy as np
@@ -207,7 +208,7 @@ class App(ctk.CTk):
                 def after_answer():
                     
                     year = v.get()
-                    if not (year.isdigit()) or int(year) < 1 or int(year) > 3000:
+                    if not (year.isdigit()) or int(year) < 2025 or int(year) > 2030:
                         CTkMessagebox(message=INCORRECT_YEAR_ERROR_TEXT)
                         return
                     else:
@@ -275,7 +276,13 @@ class App(ctk.CTk):
                     x = MONTHS_NAME
                     fig = Figure(figsize=(13, 8), dpi=70)
                     ax = fig.add_subplot(111)
-                    ax.bar(x, y)
+
+                    ax.bar(x, y, color=MAIN_COLOR)
+
+                    ax.set_xticklabels(x, rotation=45, ha='right')
+
+                    ax.yaxis.set_major_locator(plt.MaxNLocator(15))
+
                     canvas = FigureCanvasTkAgg(fig, master=prediction_result_window)
                     canvas.draw()
                     canvas.get_tk_widget().grid(row=0, rowspan=15, column=2, columnspan=6, padx=5, pady=5)
@@ -288,10 +295,16 @@ class App(ctk.CTk):
                     OK_button = ctk.CTkButton(prediction_result_window, text=OK_BUTTON_TEXT, command=prediction_result_window.destroy)
                     OK_button.grid(row=row, column=0, columnspan=2, padx=10, pady=5)
 
-                    prediction_result_window.resizable(False, False)
+                    #prediction_result_window.resizable(False, False)
 
                     prediction_result_window.attributes('-topmost', True)
 
+
+                _, scaler_X, scaler_Y = get_model(id)
+
+                if not scaler_X or not scaler_Y:
+                    CTkMessagebox(title=MODEL_ISNT_READY_ERROR_TITLE, message=MODEL_ISNT_READY_ERROR_TEXT)
+                    return
 
                 year_window = ctk.CTkToplevel(self)
                 year_window.title(YEAR_PREDICT_WINDOW_TITLE)
@@ -459,7 +472,7 @@ def show_train_window(id:str, filename:str, window:ctk.CTk, epochs:int):
         x = [i for i in range(1, epochs+1)]
         fig = Figure(figsize=(5, 4), dpi=100)
         ax = fig.add_subplot(111)
-        ax.plot(x, y)
+        ax.plot(x, y, color=MAIN_COLOR)
         canvas = FigureCanvasTkAgg(fig, master=root)
         canvas.draw()
         canvas.get_tk_widget().pack()
@@ -489,7 +502,7 @@ def show_train_window(id:str, filename:str, window:ctk.CTk, epochs:int):
     root.attributes('-topmost', True)
 
     root.geometry(f"{430}x{250}")
-    root.resizable(False, False)
+    #root.resizable(False, False)
 
     root.after(200, begin_train)
 

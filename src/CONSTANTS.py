@@ -30,3 +30,5 @@ MONTHS_NAME = [
 NO_NAME_MODEL_NAME = "<Без имени>"
 
 DEFAULT_EPOCHS = 5
+
+MAIN_COLOR = "#2cc985"
