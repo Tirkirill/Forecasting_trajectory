@@ -244,24 +244,25 @@ class App(ctk.CTk):
                         CTkMessagebox(title="Info", message=STANDARD_MODEL_ISNT_READY)
                         return
 
-                    test_years = [year] * 12
-                    test_months = [i for i in range(1, 13)]
-
-                    test_input = np.column_stack((test_years, test_months))
+                    test_years = np.array([[year] for _ in range(0, 12)])
+                    test_months = np.array([i for i in range(1, 13)])
+                    months_sin = np.sin(np.pi * (test_months-1) / 11)
+                    months_cos = np.cos(np.pi * (test_months-1) / 11)
 
                     if scaler_X is None:
                         # Нет scaler значит, что на вход даются ненормализованные числа
-                        test_input_scaled = test_input
+                        test_input_scaled = test_years.flatten()
                     else:
-                        test_input_scaled = scaler_X.transform(test_input)
+                        print(test_years)
+                        test_input_scaled = scaler_X.transform(test_years).flatten()
 
-                    predicted_temperature_scaled = model.predict(test_input_scaled)
+                    predicted_temperature_scaled = model.predict(np.column_stack([test_input_scaled, months_sin, months_cos]))
 
                     if scaler_Y is None:
                         # Нет scaler значит, что на выход выдаются ненормализованные числа
-                        predicted_temperature = predicted_temperature_scaled.reshape(12)
+                        predicted_temperature = predicted_temperature_scaled.flatten()
                     else:
-                        predicted_temperature = scaler_Y.inverse_transform(predicted_temperature_scaled).reshape(12)
+                        predicted_temperature = scaler_Y.inverse_transform(predicted_temperature_scaled).flatten()
 
                     prediction_result_window = ctk.CTkToplevel(self)
                     prediction_result_window.title(PREDICT_WINDOW_TITLE_TEMPLATE.format(year))
@@ -288,7 +289,6 @@ class App(ctk.CTk):
                     OK_button = ctk.CTkButton(prediction_result_window, text=OK_BUTTON_TEXT, command=prediction_result_window.destroy)
                     OK_button.grid(row=row, column=0, columnspan=2, padx=10, pady=5)
 
-                    #prediction_result_window.geometry("400x600")
                     prediction_result_window.resizable(False, False)
 
                     prediction_result_window.attributes('-topmost', True)

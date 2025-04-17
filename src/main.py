@@ -115,7 +115,7 @@ def get_standard_model() -> keras.src.models.model:
     model.compile(optimizer=Adam(learning_rate=0.01), loss='mse')
     return model
 
-def get_sсaled_data(years:list[int], months:list[int], temps:list[int], scaler_X:MinMaxScaler, scaler_y:MinMaxScaler) -> tuple[np.array, np.array]:
+def get_sсaled_data(years:list[int], months_sin:list[int], months_cos:list[int], temps:list[int], scaler_X:MinMaxScaler, scaler_y:MinMaxScaler) -> tuple[np.array, np.array]:
   
     '''
     Возвращает нормализованные данные
@@ -129,10 +129,11 @@ def get_sсaled_data(years:list[int], months:list[int], temps:list[int], scaler_
                     scaled_data(tuple[np.array, np.array]): нормализованны данные
     '''
 
-    X = np.column_stack((years, months))
     y = temps
 
-    X_scaled = scaler_X.fit_transform(X)
+    X_years = np.array(years).reshape(len(years), 1)
+    X_years = scaler_X.fit_transform(X_years)
+    X_scaled = np.column_stack([X_years.flatten(), months_sin, months_cos])
     y_scaled = scaler_y.fit_transform(y.reshape(-1, 1))
     return X_scaled, y_scaled
 
@@ -175,20 +176,18 @@ def train_model(model_id:str, train_data_filename:str, epochs:int, window):
     historic_data['year'] = historic_data.timestamp.dt.year
     historic_data['month'] = historic_data.timestamp.dt.month
 
-    aggregated_data = historic_data.groupby(['year', 'month'])['T'].agg(['mean'])
+    aggregated_data = historic_data.groupby(['year', 'month'])['T'].agg(['mean']).reset_index()
+    aggregated_data['month_sin'] = np.sin(np.pi * (aggregated_data['month']-1) / 11)
+    aggregated_data['month_cos'] = np.cos(np.pi * (aggregated_data['month']-1) / 11)
 
-    years = []
-    months = []
-    for year, month in np.array(aggregated_data.index):
-        years.append(year)
-        months.append(month)
+    years = aggregated_data["year"]
 
     temperatures = np.array(aggregated_data["mean"])
 
     scaler_X = MinMaxScaler()
     scaler_y = MinMaxScaler()
 
-    X_scaled, y_scaled = get_sсaled_data(years, months, temperatures, scaler_X, scaler_y)
+    X_scaled, y_scaled = get_sсaled_data(years, aggregated_data['month_sin'], aggregated_data['month_cos'], temperatures, scaler_X, scaler_y)
 
     # Оцениваем точность модели
     evaluate_test = {"mae":0, "mse":0}
