@@ -244,16 +244,15 @@ class App(ctk.CTk):
                         CTkMessagebox(title="Info", message=STANDARD_MODEL_ISNT_READY)
                         return
 
-                    test_years = np.array([[year] for _ in range(0, 12)])
+                    test_years = np.array([[int(year)] for _ in range(0, 12)])
                     test_months = np.array([i for i in range(1, 13)])
                     months_sin = np.sin(np.pi * (test_months-1) / 11)
                     months_cos = np.cos(np.pi * (test_months-1) / 11)
-
+                    
                     if scaler_X is None:
                         # Нет scaler значит, что на вход даются ненормализованные числа
                         test_input_scaled = test_years.flatten()
                     else:
-                        print(test_years)
                         test_input_scaled = scaler_X.transform(test_years).flatten()
 
                     predicted_temperature_scaled = model.predict(np.column_stack([test_input_scaled, months_sin, months_cos]))

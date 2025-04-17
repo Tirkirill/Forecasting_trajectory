@@ -126,7 +126,7 @@ def get_sсaled_data(years:list[int], months_sin:list[int], months_cos:list[int]
                     scaler_X(MinMaxScaler): модель для нормализации годов и месяцев
                     scaler_Y(MinMaxScaler): модель для нормализации температур
             Возвращаемое значение:
-                    scaled_data(tuple[np.array, np.array]): нормализованны данные
+                    scaled_data(tuple[np.array, np.array]): нормализованные данные
     '''
 
     y = temps
