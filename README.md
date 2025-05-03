@@ -7,9 +7,7 @@
 
 ```plaintext
 1. Как исходный код:
-
   1.1 Установите зависимости из `requirements.txt` pip install -r requirements.txt
-
   1.2 Запустите src/App.py
 
 3. Скачайте готовый .exe файл по ссылке:
