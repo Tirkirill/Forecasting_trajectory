@@ -5,6 +5,7 @@
 
 ## Установка
 
+```plaintext
 1. Как исходный код:
 
   1.1 Установите зависимости из `requirements.txt` pip install -r requirements.txt
@@ -12,6 +13,7 @@
   1.2 Запустите src/App.py
 
 3. Скачайте готовый .exe файл по ссылке:
+```
 
 [Ссылка на .exe (Яндекс.Диск)](https://disk.yandex.ru/d/7syoK7R71PYr-g)
 
